@@ -50,15 +50,15 @@ pub const Renderer = struct {
         fbo: c.GLuint,
     },
 
-    const vertex_shader_location = "src/shader.vs";
-    const fragment_shader_location = "src/shader.fs";
-
     fn initBuffers(self: *@This()) !void {
         c.glGenTextures(1, &self.frame.texture);
         c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGB, 800, 600, 0, c.GL_RGB, c.GL_UNSIGNED_BYTE, null);
+        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MIN_FILTER, c.GL_LINEAR);
+        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_LINEAR);
 
         c.glGenFramebuffers(1, &self.frame.fbo);
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
         // could encode more data in it by using depth and stencil attachment buffers
         c.glFramebufferTexture2D(
             c.GL_FRAMEBUFFER,
@@ -69,12 +69,11 @@ pub const Renderer = struct {
         );
         if(c.glCheckFramebufferStatus(c.GL_FRAMEBUFFER) != c.GL_FRAMEBUFFER_COMPLETE)
             return error.FramebufferIncomplete;
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
 
         c.glGenVertexArrays(1, &self.vao);
         c.glBindVertexArray(self.vao);
 
-        // because of `SCREEN` quadrants (see vertex shader)
         const indices = [6]c.GLuint{ 0, 1, 2, 0, 3, 2 };
         c.glGenBuffers(1, &self.ibo);
         c.glBindBuffer(c.GL_ELEMENT_ARRAY_BUFFER, self.ibo);
@@ -103,8 +102,6 @@ pub const Renderer = struct {
     }
 
     fn initShader(self: *@This()) !void {
-        _ = self;
-
         const vertex_source = @embedFile("shader.vs");
         const fragment_source = @embedFile("shader.fs");
 
@@ -119,13 +116,13 @@ pub const Renderer = struct {
         try shaderErrorCheck(vertex, c.GL_COMPILE_STATUS);
         try shaderErrorCheck(fragment, c.GL_COMPILE_STATUS);
 
-        const shader = c.glCreateProgram();
-        c.glAttachShader(shader, vertex);
-        c.glAttachShader(shader, fragment);
-        defer c.glDetachShader(shader, vertex);
-        defer c.glDetachShader(shader, fragment);
-        c.glLinkProgram(shader);
-        try shaderErrorCheck(shader, c.GL_LINK_STATUS);
+        self.shader = c.glCreateProgram();
+        c.glAttachShader(self.shader, vertex);
+        c.glAttachShader(self.shader, fragment);
+        defer c.glDetachShader(self.shader, vertex);
+        defer c.glDetachShader(self.shader, fragment);
+        c.glLinkProgram(self.shader);
+        try shaderErrorCheck(self.shader, c.GL_LINK_STATUS);
     }
 
     pub fn init() !@This() {
@@ -133,7 +130,8 @@ pub const Renderer = struct {
         try self.initBuffers();
         try self.initShader();
         c.glUseProgram(self.shader);
-        c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), @intCast(self.frame.texture));
+        // c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), @intCast(self.frame.texture));
+        c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), 0);
 
         return self;
     }
@@ -147,19 +145,22 @@ pub const Renderer = struct {
         c.glDeleteFramebuffers(1, &self.frame.fbo);
     }
 
-    fn draw() void {
+    fn draw(self: *@This()) void {
         c.glClearColor(0.1, 0.1, 0.1, 1);
         c.glClear(c.GL_COLOR_BUFFER_BIT);
 
+        // c.glActiveTexture(@as(c_uint, @intCast(c.GL_TEXTURE0)) + self.frame.texture);
+        c.glActiveTexture(c.GL_TEXTURE0);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glDrawElements(c.GL_TRIANGLES, 6, c.GL_UNSIGNED_INT, null);
     }
 
     pub fn update(self: *@This()) void {
         // delta time maybe?
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
-        draw();
+        self.draw();
 
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
-        draw();
+        self.draw();
     }
 };
