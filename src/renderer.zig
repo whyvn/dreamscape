@@ -43,6 +43,10 @@ pub const Renderer = struct {
 
     shader: c.GLuint,
 
+    // because of `SCREEN` quadrants (see vertex shader)
+    const indices = [6]c.GLuint{ 0, 1, 2, 0, 3, 2 };
+    const vertices = [4]c.GLfloat{ 0, 1, 2, 3 };
+
     const vertex_shader_location = "src/shader.vs";
     const fragment_shader_location = "src/shader.fs";
 
@@ -50,13 +54,10 @@ pub const Renderer = struct {
         c.glGenVertexArrays(1, &self.vao);
         c.glBindVertexArray(self.vao);
 
-        // because of `SCREEN` quadrants (see vertex shader)
-        const indices = [_]c.GLuint{ 0, 1, 2, 0, 3, 2 };
         c.glGenBuffers(1, &self.ibo);
         c.glBindBuffer(c.GL_ELEMENT_ARRAY_BUFFER, self.ibo);
         c.glBufferData(c.GL_ELEMENT_ARRAY_BUFFER, @sizeOf(@TypeOf(indices)), &indices, c.GL_STATIC_DRAW);
 
-        const vertices = [_]c.GLfloat{ 0, 1, 2, 3 };
         c.glGenBuffers(1, &self.vbo);
         c.glBindBuffer(c.GL_ARRAY_BUFFER, self.vbo);
         c.glBufferData(c.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(vertices)), &vertices, c.GL_STATIC_DRAW);
@@ -65,42 +66,43 @@ pub const Renderer = struct {
         c.glEnableVertexAttribArray(0);
     }
 
-    fn readFileToCString(allocator: *const std.mem.Allocator, path: []const u8) !?[:0]u8 {
-        const file = try std.fs.cwd().openFile(path, .{});
-        defer file.close();
-        const buffer = try allocator.alloc(u8, try file.getEndPos() + 1); // +1 for c style null termination
-        buffer[try file.readAll(buffer)] = 0;
-        // return @intToPtr(:0), buffer;
-    }
-
     fn shaderErrorCheck(shader: c.GLuint, pname: c.GLenum) !void {
-        var success = undefined;
-        var info_log: [512]u8 = undefined;
+        var success: c.GLint = undefined;
 
         c.glGetShaderiv(shader, pname, &success);
-        if(!success) {
+        if(success == 0) {
+            var info_log: [512]c.GLchar = undefined;
+            @memset(&info_log, 0);
             c.glGetShaderInfoLog(shader, 512, null, &info_log);
+            std.log.err("shader fail log: {s}", .{info_log});
             return error.ShaderCompilationFailed;
         }
     }
 
     fn initShader(self: *@This()) !void {
         _ = self;
-        const allocator = std.heap.page_allocator;
 
-        const vertex_source = try readFileToCString(&allocator, vertex_shader_location);
-        const fragment_source = try readFileToCString(&allocator, fragment_shader_location);
-        defer allocator.free(vertex_source);
-        defer allocator.free(fragment_source);
+        const vertex_source = @embedFile("shader.vs");
+        const fragment_source = @embedFile("shader.fs");
 
         const vertex = c.glCreateShader(c.GL_VERTEX_SHADER);
         const fragment = c.glCreateShader(c.GL_FRAGMENT_SHADER);
-        c.glShaderSource(vertex, 1, &vertex_source, null);
-        c.glShaderSource(fragment, 1, &fragment_source, null);
+        defer c.glDeleteShader(vertex);
+        defer c.glDeleteShader(fragment);
+        c.glShaderSource(vertex, 1, @ptrCast(&vertex_source), null);
+        c.glShaderSource(fragment, 1, @ptrCast(&fragment_source), null);
         c.glCompileShader(vertex);
         c.glCompileShader(fragment);
-        shaderErrorCheck(vertex, c.GL_COMPILE_STATUS);
-        shaderErrorCheck(fragment, c.GL_COMPILE_STATUS);
+        try shaderErrorCheck(vertex, c.GL_COMPILE_STATUS);
+        try shaderErrorCheck(fragment, c.GL_COMPILE_STATUS);
+
+        const shader = c.glCreateProgram();
+        c.glAttachShader(shader, vertex);
+        c.glAttachShader(shader, fragment);
+        defer c.glDetachShader(shader, vertex);
+        defer c.glDetachShader(shader, fragment);
+        c.glLinkProgram(shader);
+        try shaderErrorCheck(shader, c.GL_LINK_STATUS);
     }
 
     pub fn init() !@This() {
@@ -117,9 +119,8 @@ pub const Renderer = struct {
         c.glDeleteBuffers(1, &self.ibo);
     }
 
-    pub fn update() void {
+    pub fn draw() void {
         // delta time maybe?
-
-        c.glDrawElements(c.GL_TRIANGLES, 4 * @sizeOf(c.GLfloat), c.GL_UNSIGNED_INT, null);
+        c.glDrawElements(c.GL_TRIANGLES, 4, c.GL_UNSIGNED_INT, null);
     }
 };
