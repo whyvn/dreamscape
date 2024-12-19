@@ -43,21 +43,44 @@ pub const Renderer = struct {
 
     shader: c.GLuint,
 
-    // because of `SCREEN` quadrants (see vertex shader)
-    const indices = [6]c.GLuint{ 0, 1, 2, 0, 3, 2 };
-    const vertices = [4]c.GLfloat{ 0, 1, 2, 3 };
+    // data about current frame.
+    // needed for shader introspection of current frame
+    frame: struct {
+        texture: c.GLuint,
+        fbo: c.GLuint,
+    },
 
     const vertex_shader_location = "src/shader.vs";
     const fragment_shader_location = "src/shader.fs";
 
-    fn initBuffers(self: *@This()) void {
+    fn initBuffers(self: *@This()) !void {
+        c.glGenTextures(1, &self.frame.texture);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
+        c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGB, 800, 600, 0, c.GL_RGB, c.GL_UNSIGNED_BYTE, null);
+
+        c.glGenFramebuffers(1, &self.frame.fbo);
+        // could encode more data in it by using depth and stencil attachment buffers
+        c.glFramebufferTexture2D(
+            c.GL_FRAMEBUFFER,
+            c.GL_COLOR_ATTACHMENT0,
+            c.GL_TEXTURE_2D,
+            self.frame.texture,
+            0
+        );
+        if(c.glCheckFramebufferStatus(c.GL_FRAMEBUFFER) != c.GL_FRAMEBUFFER_COMPLETE)
+            return error.FramebufferIncomplete;
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
+
         c.glGenVertexArrays(1, &self.vao);
         c.glBindVertexArray(self.vao);
 
+        // because of `SCREEN` quadrants (see vertex shader)
+        const indices = [6]c.GLuint{ 0, 1, 2, 0, 3, 2 };
         c.glGenBuffers(1, &self.ibo);
         c.glBindBuffer(c.GL_ELEMENT_ARRAY_BUFFER, self.ibo);
         c.glBufferData(c.GL_ELEMENT_ARRAY_BUFFER, @sizeOf(@TypeOf(indices)), &indices, c.GL_STATIC_DRAW);
 
+        const vertices = [4]c.GLfloat{ 0, 1, 2, 3 };
         c.glGenBuffers(1, &self.vbo);
         c.glBindBuffer(c.GL_ARRAY_BUFFER, self.vbo);
         c.glBufferData(c.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(vertices)), &vertices, c.GL_STATIC_DRAW);
@@ -107,8 +130,10 @@ pub const Renderer = struct {
 
     pub fn init() !@This() {
         var self: @This() = undefined;
-        self.initBuffers();
+        try self.initBuffers();
         try self.initShader();
+        c.glUseProgram(self.shader);
+        c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), @intCast(self.frame.texture));
 
         return self;
     }
@@ -117,10 +142,24 @@ pub const Renderer = struct {
         c.glDeleteVertexArrays(1, &self.vao);
         c.glDeleteBuffers(1, &self.vbo);
         c.glDeleteBuffers(1, &self.ibo);
+
+        c.glDeleteTextures(1, &self.frame.texture);
+        c.glDeleteFramebuffers(1, &self.frame.fbo);
     }
 
-    pub fn draw() void {
+    fn draw() void {
+        c.glClearColor(0.1, 0.1, 0.1, 1);
+        c.glClear(c.GL_COLOR_BUFFER_BIT);
+
+        c.glDrawElements(c.GL_TRIANGLES, 6, c.GL_UNSIGNED_INT, null);
+    }
+
+    pub fn update(self: *@This()) void {
         // delta time maybe?
-        c.glDrawElements(c.GL_TRIANGLES, 4, c.GL_UNSIGNED_INT, null);
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
+        draw();
+
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
+        draw();
     }
 };
