@@ -4,8 +4,22 @@ pub const c = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
 
-fn framebuffer_size_callback(_: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
+fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
     c.glViewport(0, 0, width, height);
+
+    // technically dont need to use a user pointer to get Renderer
+    // since frame.texture is the only texture that can be bound
+    // so we can just use glTexImage2D
+    const renderer: ?*Renderer = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)));
+    c.glBindTexture(c.GL_TEXTURE_2D, renderer.?.frame.texture);
+    c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGB, width, height, 0, c.GL_RGB, c.GL_UNSIGNED_BYTE, null);
+
+    // dont really need to cache the location since we wont be calling this that often
+    c.glUniform2f(
+        c.glGetUniformLocation(renderer.?.shader, "u_viewport"),
+        @floatFromInt(width),
+        @floatFromInt(height)
+    );
 }
 
 const WindowCreationError = error{
@@ -54,8 +68,10 @@ pub const Renderer = struct {
         c.glGenTextures(1, &self.frame.texture);
         c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGB, 800, 600, 0, c.GL_RGB, c.GL_UNSIGNED_BYTE, null);
-        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MIN_FILTER, c.GL_LINEAR);
-        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_LINEAR);
+        // nearest neighbor is better for the effect i want
+        // but i need bi linear for blur effects in shader
+        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MIN_FILTER, c.GL_NEAREST);
+        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_NEAREST);
 
         c.glGenFramebuffers(1, &self.frame.fbo);
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
@@ -130,8 +146,10 @@ pub const Renderer = struct {
         try self.initBuffers();
         try self.initShader();
         c.glUseProgram(self.shader);
-        // c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), @intCast(self.frame.texture));
         c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), 0);
+
+        c.glActiveTexture(c.GL_TEXTURE0);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
 
         return self;
     }
@@ -145,22 +163,21 @@ pub const Renderer = struct {
         c.glDeleteFramebuffers(1, &self.frame.fbo);
     }
 
-    fn draw(self: *@This()) void {
+    fn draw() void {
         c.glClearColor(0.1, 0.1, 0.1, 1);
         c.glClear(c.GL_COLOR_BUFFER_BIT);
 
-        // c.glActiveTexture(@as(c_uint, @intCast(c.GL_TEXTURE0)) + self.frame.texture);
-        c.glActiveTexture(c.GL_TEXTURE0);
-        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glDrawElements(c.GL_TRIANGLES, 6, c.GL_UNSIGNED_INT, null);
     }
 
     pub fn update(self: *@This()) void {
         // delta time maybe?
+
+        // TODO: maybe swap buffers or something so we dont have to draw 2 frames every frame
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
-        self.draw();
+        draw();
 
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
-        self.draw();
+        draw();
     }
 };

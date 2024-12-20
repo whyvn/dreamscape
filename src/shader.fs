@@ -3,9 +3,94 @@
 out vec4 frag_colour;
 
 in vec2 v_uv;
+
+// viewport (and also `u_frame`) width and height
+uniform vec2 u_viewport;
+// frame buffer texture of previous frame
 uniform sampler2D u_frame;
 
+const float WEIGHT_HUE          = .50;
+const float WEIGHT_SATURATION   = .25;
+const float WEIGHT_VALUE        = .25;
+const vec3  WEIGHTS = vec3(WEIGHT_HUE, WEIGHT_SATURATION, WEIGHT_VALUE);
+const int   COLOURS_AMOUNT = 3;
+const vec3  COLOURS[COLOURS_AMOUNT] = vec3[COLOURS_AMOUNT](
+    vec3(0.01, 0.01, 0.01),
+    vec3(0.5, 0.1, 0.0),
+    vec3(0.2, 0.55, 0.7)
+);
+
+// https://github.com/Experience-Monks/glsl-fast-gaussian-blur/blob/master/9.glsl
+// 9 tap filter with predefined gaussian weights
+vec4 gaussian_blur() {
+    vec4 color = vec4(0.0);
+
+    vec2 off1 = vec2(1.3846153846, 0.0);
+    vec2 off2 = vec2(3.2307692308, 0.0);
+
+    color += texture2D(u_frame, v_uv) * 0.2270270270;
+    color += texture2D(u_frame, v_uv + (off1 / u_viewport)) * 0.3162162162;
+    color += texture2D(u_frame, v_uv - (off1 / u_viewport)) * 0.3162162162;
+    color += texture2D(u_frame, v_uv + (off2 / u_viewport)) * 0.0702702703;
+    color += texture2D(u_frame, v_uv - (off2 / u_viewport)) * 0.0702702703;
+
+    // redo with new direction
+    off1 = vec2(0.0, 1.3846153846);
+    off2 = vec2(0.0, 3.2307692308);
+
+    color += texture2D(u_frame, v_uv) * 0.2270270270;
+    color += texture2D(u_frame, v_uv + (off1 / u_viewport)) * 0.3162162162;
+    color += texture2D(u_frame, v_uv - (off1 / u_viewport)) * 0.3162162162;
+    color += texture2D(u_frame, v_uv + (off2 / u_viewport)) * 0.0702702703;
+    color += texture2D(u_frame, v_uv - (off2 / u_viewport)) * 0.0702702703;
+
+    return color;
+}
+
+// https://stackoverflow.com/a/17897228
+// All components are in the range [0…1], including hue.
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// https://stackoverflow.com/a/17897228
+// All components are in the range [0…1], including hue.
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+// TODO: maybe check if oklab colour space produces better results
+vec4 most_similar() {
+    vec4 blurred = gaussian_blur();
+    // TODO: how does alpha influences this?
+    vec3 colour = rgb2hsv(blurred.xyz);
+    vec2 closest_colour = vec2(0, 0); // (index, similarity score)
+
+    // TODO: could optimize by hardcoding COLOURS to also be in HSV and sorted by Hue
+    //       then using a binary search (is that even faster on gpu though cause of all the branching?)
+    for(int i = 0; i < COLOURS_AMOUNT; ++i) {
+        vec3 variant = rgb2hsv(COLOURS[i]);
+        vec3 similarity = abs(variant - colour) * WEIGHTS;
+        float score = similarity.x + similarity.y + similarity.z;
+
+        if(score > closest_colour.y)
+            closest_colour = vec2(i, score);
+    }
+
+    return vec4(COLOURS[int(closest_colour.x)], blurred.a);
+}
+
 void main() {
-    frag_colour = vec4(vec3(0.01) + texture(u_frame, v_uv).rgb, 1.0);
-    // frag_colour = vec4(v_uv, 0.0, 1.0);
+    // TODO: maybe we could interpolate towards the new colour based on how similar it is?
+    frag_colour = most_similar();
+
+    frag_colour += texture(u_frame, v_uv);
 }

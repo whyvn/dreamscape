@@ -21,6 +21,8 @@ pub fn main() void {
     };
     defer renderer.free();
 
+    ren.c.glfwSetWindowUserPointer(window, &renderer);
+
     while (ren.c.glfwWindowShouldClose(window) == ren.c.GLFW_FALSE) {
         renderer.update();
 
