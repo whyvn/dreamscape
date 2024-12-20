@@ -60,11 +60,13 @@ pub const Renderer = struct {
     // data about current frame.
     // needed for shader introspection of current frame
     frame: struct {
+        swap: bool = false,
         texture: c.GLuint,
         fbo: c.GLuint,
     },
 
     fn initBuffers(self: *@This()) !void {
+        // TODO: start with a randomly coloured texture
         c.glGenTextures(1, &self.frame.texture);
         c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGB, 800, 600, 0, c.GL_RGB, c.GL_UNSIGNED_BYTE, null);
@@ -163,21 +165,14 @@ pub const Renderer = struct {
         c.glDeleteFramebuffers(1, &self.frame.fbo);
     }
 
-    fn draw() void {
+    pub fn update(self: *@This()) void {
+        // delta time maybe?
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, if(self.frame.swap) self.frame.fbo else 0);
+        self.frame.swap = !self.frame.swap;
+
         c.glClearColor(0.1, 0.1, 0.1, 1);
         c.glClear(c.GL_COLOR_BUFFER_BIT);
 
         c.glDrawElements(c.GL_TRIANGLES, 6, c.GL_UNSIGNED_INT, null);
-    }
-
-    pub fn update(self: *@This()) void {
-        // delta time maybe?
-
-        // TODO: maybe swap buffers or something so we dont have to draw 2 frames every frame
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
-        draw();
-
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
-        draw();
     }
 };
