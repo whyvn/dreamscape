@@ -75,6 +75,7 @@ vec4 most_similar() {
     vec4 blurred = gaussian_blur();
     // TODO: how does alpha influences this?
     vec3 colour = rgb2hsv(blurred.xyz);
+    // lower score is better
     vec2 closest_colour = vec2(0, 1.0/0.0); // (index, similarity score)
 
     // TODO: could optimize by hardcoding COLOURS to also be in HSV and sorted by Hue
@@ -82,7 +83,6 @@ vec4 most_similar() {
     for(int i = 0; i < COLOURS_AMOUNT; ++i) {
         vec3 variant = rgb2hsv(COLOURS[i]);
         vec3 similarity = abs(variant - colour) * WEIGHTS;
-        // lower score is better
         float score = similarity.x + similarity.y + similarity.z;
 
         if(score < closest_colour.y)
@@ -94,8 +94,9 @@ vec4 most_similar() {
 
 void main() {
     // TODO: maybe we could interpolate towards the new colour based on how similar it is?
-    frag_colour = most_similar();
+    // frag_colour = most_similar();
 
-    frag_colour += vec4(texture(u_frame, v_uv).xyz, 0.0);
-    frag_colour = clamp(frag_colour, 0.0, 1.0);
+    // frag_colour += vec4(texture(u_frame, v_uv).xyz, 0.0);
+    // frag_colour = clamp(frag_colour, 0.0, 1.0);
+    frag_colour = texture(u_frame, v_uv);
 }

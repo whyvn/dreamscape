@@ -31,12 +31,12 @@ const WindowCreationError = error{
 pub fn createWindow() !*c.GLFWwindow {
     if (c.glfwInit() == 0)
         return error.glfwInit;
-
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, 3);
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, 3);
     c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, c.GLFW_OPENGL_CORE_PROFILE);
 
     const window = c.glfwCreateWindow(800, 600, "dreamscape", null, null);
+    errdefer c.glfwTerminate();
     if (window == null)
         return error.glfwWindowCreation;
     c.glfwMakeContextCurrent(window);
@@ -60,13 +60,13 @@ pub const Renderer = struct {
     // data about current frame.
     // needed for shader introspection of current frame
     frame: struct {
-        swap: bool = false,
+        swap: bool = true,
         texture: c.GLuint,
         fbo: c.GLuint,
     },
 
     fn initBuffers(self: *@This()) !void {
-        // TODO: start with a randomly coloured texture
+        // TODO: start with a randomly coloured texture or a texture given by the user
         c.glGenTextures(1, &self.frame.texture);
         c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGB, 800, 600, 0, c.GL_RGB, c.GL_UNSIGNED_BYTE, null);
@@ -119,9 +119,9 @@ pub const Renderer = struct {
         }
     }
 
-    fn initShader(self: *@This()) !void {
-        const vertex_source = @embedFile("shader.vs");
-        const fragment_source = @embedFile("shader.fs");
+    fn shaderMake(comptime vertex_path: []const u8, comptime fragment_path: []const u8) !c.GLuint {
+        const vertex_source = @embedFile(vertex_path);
+        const fragment_source = @embedFile(fragment_path);
 
         const vertex = c.glCreateShader(c.GL_VERTEX_SHADER);
         const fragment = c.glCreateShader(c.GL_FRAGMENT_SHADER);
@@ -134,19 +134,28 @@ pub const Renderer = struct {
         try shaderErrorCheck(vertex, c.GL_COMPILE_STATUS);
         try shaderErrorCheck(fragment, c.GL_COMPILE_STATUS);
 
-        self.shader = c.glCreateProgram();
-        c.glAttachShader(self.shader, vertex);
-        c.glAttachShader(self.shader, fragment);
-        defer c.glDetachShader(self.shader, vertex);
-        defer c.glDetachShader(self.shader, fragment);
-        c.glLinkProgram(self.shader);
-        try shaderErrorCheck(self.shader, c.GL_LINK_STATUS);
+        const shader = c.glCreateProgram();
+        c.glAttachShader(shader, vertex);
+        c.glAttachShader(shader, fragment);
+        defer c.glDetachShader(shader, vertex);
+        defer c.glDetachShader(shader, fragment);
+        c.glLinkProgram(shader);
+        try shaderErrorCheck(shader, c.GL_LINK_STATUS);
+
+        return shader;
     }
 
     pub fn init() !@This() {
         var self: @This() = undefined;
         try self.initBuffers();
-        try self.initShader();
+
+        // populate initial fbo texture
+        const init_frame = try shaderMake("shader.vs", "init.fs");
+        c.glUseProgram(init_frame);
+        self.draw();
+        c.glDeleteProgram(init_frame);
+
+        self.shader = try shaderMake("shader.vs", "shader.fs");
         c.glUseProgram(self.shader);
         c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), 0);
 
@@ -161,11 +170,12 @@ pub const Renderer = struct {
         c.glDeleteBuffers(1, &self.vbo);
         c.glDeleteBuffers(1, &self.ibo);
 
+        c.glDeleteProgram(self.shader);
         c.glDeleteTextures(1, &self.frame.texture);
         c.glDeleteFramebuffers(1, &self.frame.fbo);
     }
 
-    pub fn update(self: *@This()) void {
+    pub fn draw(self: *@This()) void {
         // delta time maybe?
         c.glBindFramebuffer(c.GL_FRAMEBUFFER, if(self.frame.swap) self.frame.fbo else 0);
         self.frame.swap = !self.frame.swap;

@@ -4,13 +4,6 @@ const ren = @import("renderer.zig");
 pub fn main() void {
     const window = ren.createWindow() catch |err| {
         std.log.err("window creation error: {s}", .{@errorName(err)});
-
-        switch(err) {
-            error.glfwWindowCreation,
-            error.gladLoading => ren.c.glfwTerminate(),
-            else => {}
-        }
-
         return;
     };
     defer ren.c.glfwTerminate();
@@ -24,7 +17,7 @@ pub fn main() void {
     ren.c.glfwSetWindowUserPointer(window, &renderer);
 
     while (ren.c.glfwWindowShouldClose(window) == ren.c.GLFW_FALSE) {
-        renderer.update();
+        renderer.draw();
 
         if (ren.c.glfwGetKey(window, ren.c.GLFW_KEY_ESCAPE) == ren.c.GLFW_PRESS)
             ren.c.glfwSetWindowShouldClose(window, ren.c.GLFW_TRUE);
