@@ -2,6 +2,8 @@
 out vec4 frag_colour;
 in vec2 v_uv;
 
+uniform float u_seed;
+
 // https://stackoverflow.com/a/4275343
 vec4 random_colour(vec2 seed){
     float n = dot(seed, vec2(12.9898, 78.233));
@@ -10,5 +12,5 @@ vec4 random_colour(vec2 seed){
 
 void main() {
     // frag_colour = texture(, v_uv);
-    frag_colour = random_colour(v_uv);
+    frag_colour = random_colour(v_uv * u_seed);
 }

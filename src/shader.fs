@@ -94,9 +94,10 @@ vec4 most_similar() {
 
 void main() {
     // TODO: maybe we could interpolate towards the new colour based on how similar it is?
-    // frag_colour = most_similar();
+    frag_colour = most_similar();
 
-    // frag_colour += vec4(texture(u_frame, v_uv).xyz, 0.0);
-    // frag_colour = clamp(frag_colour, 0.0, 1.0);
-    frag_colour = texture(u_frame, v_uv);
+    frag_colour += vec4(texture(u_frame, v_uv).xyz, 0.0);
+    frag_colour = clamp(frag_colour, 0.0, 1.0);
+
+    // frag_colour = texture(u_frame, v_uv);
 }
