@@ -61,32 +61,40 @@ pub const Renderer = struct {
     // needed for shader introspection of current frame
     frame: struct {
         texture: c.GLuint,
+        rbo: c.GLuint,
         fbo: c.GLuint,
     },
 
     fn initBuffers(self: *@This()) !void {
-        // TODO: start with a randomly coloured texture or a texture given by the user
-        c.glGenTextures(1, &self.frame.texture);
-        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
-        c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGBA, 800, 600, 0, c.GL_RGBA, c.GL_UNSIGNED_BYTE, null);
-        // nearest neighbor is better for the effect i want
-        // but i need bi linear for blur effects in shader
-        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MIN_FILTER, c.GL_NEAREST);
-        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_NEAREST);
+        {
+            // TODO: start with a randomly coloured texture or a texture given by the user
+            c.glGenTextures(1, &self.frame.texture);
+            c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
+            c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGBA, 800, 600, 0, c.GL_RGBA, c.GL_UNSIGNED_BYTE, null);
+            // nearest neighbor is better for the effect i want
+            // but i need bi linear for blur effects in shader
+            c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MIN_FILTER, c.GL_NEAREST);
+            c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_NEAREST);
 
-        c.glGenFramebuffers(1, &self.frame.fbo);
-        c.glBindFramebuffer(c.GL_READ_FRAMEBUFFER, self.frame.fbo);
-        // could encode more data in it by using depth and stencil attachment buffers
-        c.glFramebufferTexture2D(
-            c.GL_READ_FRAMEBUFFER,
-            c.GL_COLOR_ATTACHMENT0,
-            c.GL_TEXTURE_2D,
-            self.frame.texture,
-            0
-        );
-        if(c.glCheckFramebufferStatus(c.GL_READ_FRAMEBUFFER) != c.GL_FRAMEBUFFER_COMPLETE)
-            return error.FramebufferIncomplete;
-        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
+            c.glGenRenderbuffers(1, &self.frame.rbo);
+            c.glBindRenderbuffer(c.GL_RENDERBUFFER, self.frame.rbo);
+            c.glRenderbufferStorage(c.GL_RENDERBUFFER, c.GL_DEPTH24_STENCIL8, 800, 600);
+
+            c.glGenFramebuffers(1, &self.frame.fbo);
+            c.glBindFramebuffer(c.GL_READ_FRAMEBUFFER, self.frame.fbo);
+            // could encode more data in it by using depth and stencil attachment buffers
+            c.glFramebufferTexture2D(
+                c.GL_READ_FRAMEBUFFER,
+                c.GL_COLOR_ATTACHMENT0,
+                c.GL_TEXTURE_2D,
+                self.frame.texture,
+                0
+            );
+            c.glFramebufferRenderbuffer(c.GL_READ_FRAMEBUFFER, c.GL_DEPTH_STENCIL_ATTACHMENT, c.GL_RENDERBUFFER, self.frame.rbo);
+            if(c.glCheckFramebufferStatus(c.GL_READ_FRAMEBUFFER) != c.GL_FRAMEBUFFER_COMPLETE)
+                return error.FramebufferIncomplete;
+            c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
+        }
 
         c.glGenVertexArrays(1, &self.vao);
         c.glBindVertexArray(self.vao);
@@ -153,23 +161,17 @@ pub const Renderer = struct {
         var self: @This() = undefined;
         try self.initBuffers();
 
-        c.glBindFramebuffer(c.GL_READ_FRAMEBUFFER, self.frame.fbo);
-        c.glBindFramebuffer(c.GL_DRAW_FRAMEBUFFER, 0);
-
         // populate initial fbo texture
-        // const init_frame = try shaderMake("shader.vs", "init.fs");
-        // c.glUseProgram(init_frame);
-        // var rand = std.rand.DefaultPrng.init(0);
-        // c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
-        // draw();
-        // c.glDeleteProgram(init_frame);
+        const init_frame = try shaderMake("shader.vs", "init.fs");
+        c.glUseProgram(init_frame);
+        var rand = std.rand.DefaultPrng.init(0);
+        c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
+        self.draw();
+        c.glDeleteProgram(init_frame);
 
         self.shader = try shaderMake("shader.vs", "shader.fs");
         c.glUseProgram(self.shader);
         c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), 0);
-
-        c.glActiveTexture(c.GL_TEXTURE0);
-        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
 
         return self;
     }
@@ -181,21 +183,25 @@ pub const Renderer = struct {
 
         c.glDeleteProgram(self.shader);
         c.glDeleteTextures(1, &self.frame.texture);
+        c.glDeleteRenderbuffers(1, &self.frame.rbo);
         c.glDeleteFramebuffers(1, &self.frame.fbo);
     }
 
-    pub fn draw() void {
+    pub fn draw(self: *@This()) void {
         // delta time maybe?
 
-        var viewport: [4]c.GLint = undefined;
-        c.glGetIntegerv(c.GL_VIEWPORT, &viewport);
-        const width = viewport[2];
-        const height = viewport[3];
-        c.glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, c.GL_COLOR_BUFFER_BIT, c.GL_LINEAR);
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, self.frame.fbo);
+        c.glClearColor(0.1, 0.1, 0.1, 1);
+        c.glClear(c.GL_COLOR_BUFFER_BIT | c.GL_DEPTH_BUFFER_BIT);
+        c.glEnable(c.GL_DEPTH_TEST);
+        c.glDrawElements(c.GL_TRIANGLES, 6, c.GL_UNSIGNED_INT, null);
 
+        c.glBindFramebuffer(c.GL_FRAMEBUFFER, 0);
         c.glClearColor(0.1, 0.1, 0.1, 1);
         c.glClear(c.GL_COLOR_BUFFER_BIT);
-
+        c.glDisable(c.GL_DEPTH_TEST);
+        c.glActiveTexture(c.GL_TEXTURE0);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.frame.texture);
         c.glDrawElements(c.GL_TRIANGLES, 6, c.GL_UNSIGNED_INT, null);
     }
 };

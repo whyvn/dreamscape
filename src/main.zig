@@ -17,7 +17,7 @@ pub fn main() void {
     ren.c.glfwSetWindowUserPointer(window, &renderer);
 
     while (ren.c.glfwWindowShouldClose(window) == ren.c.GLFW_FALSE) {
-        ren.Renderer.draw();
+        renderer.draw();
 
         if (ren.c.glfwGetKey(window, ren.c.GLFW_KEY_ESCAPE) == ren.c.GLFW_PRESS)
             ren.c.glfwSetWindowShouldClose(window, ren.c.GLFW_TRUE);
