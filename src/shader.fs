@@ -89,15 +89,18 @@ vec4 most_similar() {
             closest_colour = vec2(i, score);
     }
 
-    return vec4(COLOURS[int(closest_colour.x)], blurred.a);
+    return vec4(COLOURS[int(closest_colour.x)], closest_colour.y);
 }
 
 void main() {
-    // TODO: maybe we could interpolate towards the new colour based on how similar it is?
-    frag_colour = most_similar();
+    vec4 similar = most_similar();
+    frag_colour = vec4(mix(
+        similar.xyz,
+        texture(u_frame, v_uv).xyz,
+        similar.w // we need a scalar
+    ), 1.0);
 
-    frag_colour += vec4(texture(u_frame, v_uv).xyz, 0.0);
     frag_colour = clamp(frag_colour, 0.0, 1.0);
 
-    // frag_colour = texture(u_frame, v_uv);
+    frag_colour = texture(u_frame, v_uv);
 }
