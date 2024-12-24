@@ -23,6 +23,8 @@ fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int
         @floatFromInt(width),
         @floatFromInt(height)
     );
+
+    renderer.?.populateBuffer() catch {};
 }
 
 const WindowCreationError = error{
@@ -138,17 +140,29 @@ pub const Renderer = struct {
         return shader;
     }
 
+    /// populate initial fbo texture
+    pub fn populateBuffer(self: *@This()) !void {
+        const init_frame = try shaderMake("shader.vs", "init.fs");
+        c.glUseProgram(init_frame);
+
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        var rand = std.rand.DefaultPrng.init(seed);
+        c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
+
+        self.draw();
+        c.glDeleteProgram(init_frame);
+        c.glUseProgram(self.shader);
+    }
+
     pub fn init() !@This() {
         var self: @This() = undefined;
         try self.initBuffers();
+        c.glActiveTexture(c.GL_TEXTURE0);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
 
-        // populate initial fbo texture
-        const init_frame = try shaderMake("shader.vs", "init.fs");
-        c.glUseProgram(init_frame);
-        var rand = std.rand.DefaultPrng.init(0);
-        c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
-        self.draw();
-        c.glDeleteProgram(init_frame);
+        self.shader = 0;
+        try self.populateBuffer();
 
         self.shader = try shaderMake("shader.vs", "shader.fs");
         c.glUseProgram(self.shader);
@@ -167,8 +181,6 @@ pub const Renderer = struct {
     }
 
     pub fn draw(self: *@This()) void {
-        c.glActiveTexture(c.GL_TEXTURE0);
-        c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
         c.glCopyTexSubImage2D(
             c.GL_TEXTURE_2D,
             0, 0, 0, 0, 0,

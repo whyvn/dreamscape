@@ -75,17 +75,17 @@ vec4 most_similar() {
     vec4 blurred = gaussian_blur();
     // TODO: how does alpha influences this?
     vec3 colour = rgb2hsv(blurred.xyz);
-    // lower score is better
-    vec2 closest_colour = vec2(0, 1.0/0.0); // (index, similarity score)
+    vec2 closest_colour = vec2(-1); // (index, similarity score)
 
     // TODO: could optimize by hardcoding COLOURS to also be in HSV and sorted by Hue
     //       then using a binary search (is that even faster on gpu though cause of all the branching?)
     for(int i = 0; i < COLOURS_AMOUNT; ++i) {
         vec3 variant = rgb2hsv(COLOURS[i]);
-        vec3 similarity = abs(variant - colour) * WEIGHTS;
+        // opposite results if you dont invert (1.0 - ...) here
+        vec3 similarity = 1.0 - abs(variant - colour) * WEIGHTS;
         float score = similarity.x + similarity.y + similarity.z;
 
-        if(score < closest_colour.y)
+        if(score > closest_colour.y)
             closest_colour = vec2(i, score);
     }
 
@@ -95,12 +95,10 @@ vec4 most_similar() {
 void main() {
     vec4 similar = most_similar();
     frag_colour = vec4(mix(
-        similar.xyz,
         texture(u_frame, v_uv).xyz,
-        similar.w // we need a scalar
+        similar.xyz,
+        similar.w / 30.0
     ), 1.0);
 
     frag_colour = clamp(frag_colour, 0.0, 1.0);
-
-    frag_colour = texture(u_frame, v_uv);
 }

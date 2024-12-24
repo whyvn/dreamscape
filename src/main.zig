@@ -19,8 +19,12 @@ pub fn main() void {
     while (ren.c.glfwWindowShouldClose(window) == ren.c.GLFW_FALSE) {
         renderer.draw();
 
-        if (ren.c.glfwGetKey(window, ren.c.GLFW_KEY_ESCAPE) == ren.c.GLFW_PRESS)
+        if (ren.c.glfwGetKey(window, ren.c.GLFW_KEY_ESCAPE) == ren.c.GLFW_PRESS) {
             ren.c.glfwSetWindowShouldClose(window, ren.c.GLFW_TRUE);
+        } else if(ren.c.glfwGetKey(window, ren.c.GLFW_KEY_R) == ren.c.GLFW_PRESS) {
+            renderer.populateBuffer() catch {};
+        }
+
 
         ren.c.glfwSwapBuffers(window);
         ren.c.glfwPollEvents();
