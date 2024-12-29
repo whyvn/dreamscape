@@ -8,47 +8,62 @@ const c = @cImport({
 const math = @import("zlm");
 
 pub const World = struct {
+    window: ?*c.GLFWwindow,
     // use delta values for movement.
     input_loc: c.GLint,
 
     pos: struct {
-        x: f32 = 0,
+        x: f32 = 1,
         y: f32 = 0,
         z: f32 = 0
     } = .{},
 
     camera: struct {
         yaw: f32 = 0,
-        pitch: f32 = 0,
+        pitch: f32 = 1,
         roll: f32 = 0,
         // fov: f32 = 0,
 
         // enabled: bool = true
     } = .{},
 
+    delta_time: f64 = 0,
     last_frame: f64 = 0,
 
-    pub fn init(shader: c.GLuint) @This() {
+    pub fn init(window: ?*c.GLFWwindow, shader: c.GLuint) @This() {
         return @This() {
+            .window = window,
             .input_loc = c.glGetUniformLocation(shader, "u_world_input")
         };
     }
 
+    fn input_to_value(self: *@This(), key: c_int) f32 {
+        return
+            @as(f32, @floatCast(self.delta_time)) *
+            @as(f32, @floatFromInt(@intFromBool(c.glfwGetKey(self.window, key) == c.GLFW_PRESS)));
+    }
+
     // gets input and updates uniforms
-    pub fn frame(self: *@This(), window: ?*c.GLFWwindow) void {
+    pub fn frame(self: *@This()) void {
+        // self.pos = .{};
+        // self.camera = .{};
+
         const current_frame = c.glfwGetTime();
-        const delta_time = current_frame - self.last_frame;
+        self.delta_time = current_frame - self.last_frame;
         self.last_frame = current_frame;
 
-        if(c.glfwGetKey(window, c.GLFW_KEY_LEFT) == c.GLFW_PRESS)
-            self.pos.x += @floatCast(delta_time);
+        self.pos = .{
+            .x = self.input_to_value(c.GLFW_KEY_RIGHT) - self.input_to_value(c.GLFW_KEY_LEFT),
+            .y = self.input_to_value(c.GLFW_KEY_UP) - self.input_to_value(c.GLFW_KEY_DOWN),
+        };
 
-        std.debug.print("{d}\n", .{self.pos.x});
-        const input = math.Mat3{
+        // TODO: camera stuff
+        const input = math.Mat4{
             .fields = .{
-                .{self.pos.x, self.pos.y, self.pos.z},
-                .{self.camera.yaw, self.camera.pitch, self.camera.roll},
-                .{0, 0, 0},
+                .{0,    0,  0, self.pos.x   },
+                .{0,    0,  0, self.pos.y   },
+                .{0,    0,  0, self.pos.z   },
+                .{0,    0,  0, 0            }
             },
         };
 

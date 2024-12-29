@@ -8,8 +8,8 @@ in vec2 v_uv;
 uniform vec2 u_viewport;
 // frame buffer texture of previous frame
 uniform sampler2D u_frame;
-// client input
-uniform mat3 u_world_input;
+// matrix of client input to determine pixel movements
+uniform mat4 u_world_input;
 
 const float WEIGHT_HUE          = .50;
 const float WEIGHT_SATURATION   = .25;
@@ -96,17 +96,36 @@ vec4 most_similar() {
     return vec4(COLOURS[int(closest_colour.x)], closest_colour.y);
 }
 
+// the illusion of movement by pushing pixels around
+void push(vec4 current_colour) {
+    // TODO: could set the uniform to be unit instead of viewport
+    //       to only divide on size change + we only use viewport
+    //       for this unit maths even when blurring
+    vec4 unit = vec4(1/u_viewport, 0.0, 1.0);
+
+    frag_colour = mix(
+        current_colour,
+        texture(
+            u_frame,
+            (vec4(v_uv, 0.0, 1.0) + unit * u_world_input).xy
+        ),
+        // 1.0
+        0.85
+    );
+}
+
 void main() {
     vec4 similar = most_similar();
     frag_colour = vec4(mix(
         texture(u_frame, v_uv).xyz,
         similar.xyz,
-        similar.w / 30
+        // 0.0
+        similar.w / (3 * 10)
     ), 1.0);
 
     frag_colour = clamp(frag_colour, 0.0, 1.0);
 
-    // if(u_world_input[0].x != 0)
-        // frag_colour = vec4(1);
-    frag_colour = vec4(u_world_input[0].x);
+    // TODO: not sure if an empty u_world_input
+    //       matrix is faster than redundant code
+    push(frag_colour);
 }
