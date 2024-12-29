@@ -8,20 +8,25 @@ in vec2 v_uv;
 uniform vec2 u_viewport;
 // frame buffer texture of previous frame
 uniform sampler2D u_frame;
+// client input
+uniform mat3 u_world_input;
 
 const float WEIGHT_HUE          = .50;
 const float WEIGHT_SATURATION   = .25;
 const float WEIGHT_VALUE        = .25;
 const vec3  WEIGHTS = vec3(WEIGHT_HUE, WEIGHT_SATURATION, WEIGHT_VALUE);
-const int   COLOURS_AMOUNT = 6;
+const int   COLOURS_AMOUNT = 9;
 const vec3  COLOURS[COLOURS_AMOUNT] = vec3[COLOURS_AMOUNT](
     vec3(0.00, 0.00, 0.00),
     vec3(1.00, 1.00, 1.00),
 
     vec3(0.01, 0.01, 0.01),
-    vec3(0.50, 0.10, 0.00),
+    vec3(0.50, 0.12, 0.10),
     vec3(0.20, 0.55, 0.70),
-    vec3(0.20, 0.20, 0.10)
+    vec3(0.20, 0.20, 0.10),
+    vec3(0.33, 0.12, 0.20),
+    vec3(0.10, 0.60, 0.30),
+    vec3(0.87, 0.59, 0.22)
 );
 
 // https://github.com/Experience-Monks/glsl-fast-gaussian-blur/blob/master/9.glsl
@@ -40,8 +45,8 @@ vec4 gaussian_blur() {
     horizontal += texture2D(u_frame, v_uv - (off2 / u_viewport)) * 0.0702702703;
 
     // redo with new direction
-    off1 = vec2(0.0, 1.3846153846);
-    off2 = vec2(0.0, 3.2307692308);
+    off1 = off1.yx;
+    off2 = off2.yx;
 
     vertical += texture2D(u_frame, v_uv) * 0.2270270270;
     vertical += texture2D(u_frame, v_uv + (off1 / u_viewport)) * 0.3162162162;
@@ -81,7 +86,6 @@ vec4 most_similar() {
     //       then using a binary search (is that even faster on gpu though cause of all the branching?)
     for(int i = 0; i < COLOURS_AMOUNT; ++i) {
         vec3 variant = rgb2hsv(COLOURS[i]);
-        // opposite results if you dont invert (1.0 - ...) here
         vec3 similarity = 1.0 - abs(variant - colour) * WEIGHTS;
         float score = similarity.x + similarity.y + similarity.z;
 
@@ -97,8 +101,12 @@ void main() {
     frag_colour = vec4(mix(
         texture(u_frame, v_uv).xyz,
         similar.xyz,
-        similar.w / 30.0
+        similar.w / 30
     ), 1.0);
 
     frag_colour = clamp(frag_colour, 0.0, 1.0);
+
+    // if(u_world_input[0].x != 0)
+        // frag_colour = vec4(1);
+    frag_colour = vec4(u_world_input[0].x);
 }

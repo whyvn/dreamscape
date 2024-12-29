@@ -1,5 +1,6 @@
 const std = @import("std");
 const ren = @import("renderer.zig");
+const wrld = @import("world.zig");
 
 pub fn main() void {
     const window = ren.createWindow() catch |err| {
@@ -13,8 +14,9 @@ pub fn main() void {
         return;
     };
     defer renderer.free();
-
     ren.c.glfwSetWindowUserPointer(window, &renderer);
+
+    var world = wrld.World.init(renderer.shader);
 
     while (ren.c.glfwWindowShouldClose(window) == ren.c.GLFW_FALSE) {
         renderer.draw();
@@ -25,6 +27,7 @@ pub fn main() void {
             renderer.populateBuffer() catch {};
         }
 
+        world.frame(window);
 
         ren.c.glfwSwapBuffers(window);
         ren.c.glfwPollEvents();
