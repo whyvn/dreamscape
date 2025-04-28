@@ -100,6 +100,7 @@ vec4 most_similar() {
 
 // the inverse inluence that a push has to change the colour of the pixel its pushing too
 // const float PUSH_INFLUENCE = 0.85;
+// TODO: make these constants changable via cmd args
 const float PUSH_INFLUENCE = 0.9999;
 // the illusion of movement by pushing pixels around
 void push(vec4 current_colour) {

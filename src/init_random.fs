@@ -55,7 +55,6 @@ float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 // "
 
 void main() {
-    // frag_colour = texture(start, v_uv);
     float rand = random(vec3(gl_FragCoord.xy, u_seed));
     frag_colour = vec4(
         rand,
@@ -63,5 +62,4 @@ void main() {
         random(random(rand)),
         1.0
     );
-    // frag_colour = vec4(v_uv, 0.0, 1.0);
 }

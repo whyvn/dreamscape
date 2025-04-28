@@ -1,8 +1,9 @@
 const std = @import("std");
-pub const c = @cImport({
+const c = @cImport({
     @cInclude("glad/glad.h");
     @cInclude("GLFW/glfw3.h");
 });
+const zstbi = @import("zstbi");
 
 fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
     c.glViewport(0, 0, width, height);
@@ -56,6 +57,11 @@ pub fn createWindow() !*c.GLFWwindow {
 }
 
 pub const Renderer = struct {
+    const startingPoint = enum {
+        random,
+        texture
+    };
+
     vao: c.GLuint,
     ibo: c.GLuint,
     vbo: c.GLuint,
@@ -68,6 +74,12 @@ pub const Renderer = struct {
         width: c_int,
         height: c_int
     },
+
+    startup: struct {
+        starting_point: startingPoint = .random,
+        texture_name: ?[]const u8 = .{0},
+        texture: ?[]const u8 = .{0},
+    } = .{},
 
     fn initBuffers(self: *@This()) !void {
         // TODO: start with a randomly coloured texture or a texture given by the user
@@ -140,23 +152,59 @@ pub const Renderer = struct {
         return shader;
     }
 
+    fn addNoise(self: *@This()) !void {
+        _ = self;
+        // TODO: implement a function that half mixes a bit of random pixel values to the framebfufer
+    }
+
     /// populate initial fbo texture
     pub fn populateBuffer(self: *@This()) !void {
-        const init_frame = try shaderMake("shader.vs", "init.fs");
-        c.glUseProgram(init_frame);
+        switch(self.startup.starting_point) {
+            .random => {
+                const init_frame = try shaderMake("shader.vs", "init_random.fs");
+                defer c.glDeleteProgram(init_frame);
+                c.glUseProgram(init_frame);
 
-        var seed: u64 = undefined;
-        try std.posix.getrandom(std.mem.asBytes(&seed));
-        var rand = std.rand.DefaultPrng.init(seed);
-        c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
+                var seed: u64 = undefined;
+                try std.posix.getrandom(std.mem.asBytes(&seed));
+                var rand = std.rand.DefaultPrng.init(seed);
+                c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
 
-        self.draw();
-        c.glDeleteProgram(init_frame);
+                self.draw();
+            },
+
+            .texture => {
+                const init_frame = try shaderMake("shader.vs", "init_texture.fs");
+                defer c.glDeleteProgram(init_frame);
+                c.glUseProgram(init_frame);
+
+                var texture: c.GLuint = undefined;
+                c.glGenTextures(1, &texture);
+
+                var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+                defer _ = gpa.deinit();
+
+                zstbi.init(gpa.allocator());
+                defer zstbi.deinit();
+                zstbi.setFlipVerticallyOnLoad(true);
+                var img = try zstbi.Image.loadFromFile("awesomeface.png", 0);
+                defer img.deinit();
+
+                const format = c.GL_RGB + @intFromBool(img.num_components == 4) - @as(c_int, @intFromBool(img.num_components == 1))*4;
+                c.glTexImage2D(c.GL_TEXTURE_2D, 0, format, @intCast(img.width), @intCast(img.height), 0, @intCast(format), c.GL_UNSIGNED_BYTE, img.data.ptr);
+                c.glUniform1i(c.glGetUniformLocation(init_frame, "start"), 1);
+
+                self.draw();
+                c.glDeleteTextures(1, &texture);
+            }
+        }
+
         c.glUseProgram(self.shader);
     }
 
-    pub fn init() !@This() {
+    pub fn init(starting_point: startingPoint) !@This() {
         var self: @This() = undefined;
+        self.startup.starting_point = starting_point;
         try self.initBuffers();
         c.glActiveTexture(c.GL_TEXTURE0);
         c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
