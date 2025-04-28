@@ -11,11 +11,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
-    const zlm_module = b.addModule("zlm", .{
-        .root_source_file = b.path("zlm/src/zlm.zig"),
-        .target = target,
-        .optimize = optimize
-    });
+    const zlm_module = b.dependency("zlm", .{}).module("zlm");
     exec.root_module.addImport("zlm", zlm_module);
 
     exec.linkSystemLibrary("glfw");

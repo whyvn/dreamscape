@@ -171,7 +171,7 @@ pub const Renderer = struct {
         return self;
     }
 
-    pub fn free(self: *@This()) void {
+    pub fn deinit(self: *@This()) void {
         c.glDeleteVertexArrays(1, &self.vao);
         c.glDeleteBuffers(1, &self.vbo);
         c.glDeleteBuffers(1, &self.ibo);

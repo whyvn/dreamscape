@@ -13,7 +13,7 @@ pub fn main() void {
         std.log.err("failed to initialise graphics stuff: {s}", .{@errorName(err)});
         return;
     };
-    defer renderer.free();
+    defer renderer.deinit();
     ren.c.glfwSetWindowUserPointer(window, &renderer);
 
     var world = wrld.World.init(window, renderer.shader);

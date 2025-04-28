@@ -4,8 +4,7 @@ const c = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
 
-// const math = @import("../zlm/src/zlm.zig");
-const math = @import("zlm");
+const zlm = @import("zlm");
 
 pub const World = struct {
     window: ?*c.GLFWwindow,
@@ -58,7 +57,7 @@ pub const World = struct {
         };
 
         // TODO: camera stuff
-        const input = math.Mat4{
+        const input = zlm.Mat4{
             .fields = .{
                 .{0,    0,  0, self.pos.x   },
                 .{0,    0,  0, self.pos.y   },
