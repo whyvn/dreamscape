@@ -29,6 +29,8 @@ const vec3  COLOURS[COLOURS_AMOUNT] = vec3[COLOURS_AMOUNT](
     vec3(0.87, 0.59, 0.22)
 );
 
+const vec2 CENTRE = vec2(0.5);
+
 // https://github.com/Experience-Monks/glsl-fast-gaussian-blur/blob/master/9.glsl
 // 9 tap filter with predefined gaussian weights
 vec4 gaussian_blur() {
@@ -96,21 +98,26 @@ vec4 most_similar() {
     return vec4(COLOURS[int(closest_colour.x)], closest_colour.y);
 }
 
+// the inverse inluence that a push has to change the colour of the pixel its pushing too
+// const float PUSH_INFLUENCE = 0.85;
+const float PUSH_INFLUENCE = 0.9999;
 // the illusion of movement by pushing pixels around
 void push(vec4 current_colour) {
     // TODO: could set the uniform to be unit instead of viewport
     //       to only divide on size change + we only use viewport
     //       for this unit maths even when blurring
     vec4 unit = vec4(1/u_viewport, 0.0, 1.0);
+    vec4 next = vec4(v_uv, 0.0, 1.0);
+    next += unit * u_world_input; // translations
+    next += vec4((v_uv - CENTRE) * -u_world_input[2][2], 0.0, 0.0); // zoom
 
     frag_colour = mix(
         current_colour,
         texture(
             u_frame,
-            (vec4(v_uv, 0.0, 1.0) + unit * u_world_input).xy
+            next.xy
         ),
-        // 1.0
-        0.85
+        PUSH_INFLUENCE
     );
 }
 

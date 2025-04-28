@@ -10,21 +10,21 @@ fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int
     // technically dont need to use a user pointer to get Renderer
     // since frame.texture is the only texture that can be bound
     // so we can just use glTexImage2D
-    const renderer: ?*Renderer = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(window)));
-    renderer.?.viewport.width = width;
-    renderer.?.viewport.height = height;
+    const renderer = @import("shared.zig").glfwShared.getRenderer(window.?);
+    renderer.viewport.width = width;
+    renderer.viewport.height = height;
 
-    c.glBindTexture(c.GL_TEXTURE_2D, renderer.?.backbuffer);
+    c.glBindTexture(c.GL_TEXTURE_2D, renderer.backbuffer);
     c.glTexImage2D(c.GL_TEXTURE_2D, 0, c.GL_RGBA, width, height, 0, c.GL_RGBA, c.GL_UNSIGNED_BYTE, null);
 
     // dont really need to cache the location since we wont be calling this that often
     c.glUniform2f(
-        c.glGetUniformLocation(renderer.?.shader, "u_viewport"),
+        c.glGetUniformLocation(renderer.shader, "u_viewport"),
         @floatFromInt(width),
         @floatFromInt(height)
     );
 
-    renderer.?.populateBuffer() catch {};
+    renderer.populateBuffer() catch {};
 }
 
 const WindowCreationError = error{

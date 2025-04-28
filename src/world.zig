@@ -26,17 +26,24 @@ pub const World = struct {
         // enabled: bool = true
     } = .{},
 
+    mouse: struct {
+        x: f64 = 0,
+        y: f64 = 0,
+        last_x: f64 = 0,
+        last_y: f64 = 0
+    } = .{},
+
     delta_time: f64 = 0,
     last_frame: f64 = 0,
 
     pub fn init(window: ?*c.GLFWwindow, shader: c.GLuint) @This() {
-        return @This() {
+        return .{
             .window = window,
             .input_loc = c.glGetUniformLocation(shader, "u_world_input")
         };
     }
 
-    fn input_to_value(self: *@This(), key: c_int) f32 {
+    fn inputToValue(self: *@This(), key: c_int) f32 {
         return
             @as(f32, @floatCast(self.delta_time)) *
             @as(f32, @floatFromInt(@intFromBool(c.glfwGetKey(self.window, key) == c.GLFW_PRESS)));
@@ -44,26 +51,44 @@ pub const World = struct {
 
     // gets input and updates uniforms
     pub fn frame(self: *@This()) void {
-        // self.pos = .{};
-        // self.camera = .{};
-
         const current_frame = c.glfwGetTime();
         self.delta_time = current_frame - self.last_frame;
         self.last_frame = current_frame;
 
         self.pos = .{
-            .x = self.input_to_value(c.GLFW_KEY_RIGHT) - self.input_to_value(c.GLFW_KEY_LEFT),
-            .y = self.input_to_value(c.GLFW_KEY_UP) - self.input_to_value(c.GLFW_KEY_DOWN),
+            .x = self.inputToValue(c.GLFW_KEY_RIGHT) - self.inputToValue(c.GLFW_KEY_LEFT),
+            .y = self.inputToValue(c.GLFW_KEY_UP) - self.inputToValue(c.GLFW_KEY_DOWN),
+            .z = self.inputToValue(c.GLFW_KEY_W) - self.inputToValue(c.GLFW_KEY_S),
         };
 
-        // TODO: camera stuff
+        self.camera = .{
+            .yaw = @as(f32, @floatCast(self.mouse.x - self.mouse.last_x)),
+            .pitch = @as(f32, @floatCast(self.mouse.y - self.mouse.last_y))
+        };
+        self.mouse = .{};
+
+        self.setInputs();
+    }
+
+    pub fn mouseCallback(window: ?*c.GLFWwindow, x_pos: f64, y_pos: f64) callconv(.C) void {
+        const world = @import("shared.zig").glfwShared.getWorld(window.?);
+        world.mouse = .{
+            .last_x = world.mouse.x,
+            .last_y = world.mouse.y,
+            .x = x_pos,
+            .y = y_pos
+        };
+    }
+
+    pub fn setInputs(self: *@This()) void {
+        // dont use identitiy matrix since we are just adding this since its like fake movement
         const input = zlm.Mat4{
             .fields = .{
-                .{0,    0,  0, self.pos.x   },
-                .{0,    0,  0, self.pos.y   },
-                .{0,    0,  0, self.pos.z   },
-                .{0,    0,  0, 0            }
-            },
+                .{0,    0,          0, self.pos.x   },
+                .{0,    0,          0, self.pos.y   },
+                .{0,    0,          self.pos.z, 0   },
+                .{0,    0,          0, 0            }
+            }
         };
 
         c.glUniformMatrix4fv(self.input_loc, 1, c.GL_FALSE, @ptrCast(&input.fields));
