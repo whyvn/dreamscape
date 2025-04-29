@@ -17,7 +17,18 @@ pub fn main() void {
     c.glfwSetInputMode(window, c.GLFW_CURSOR, c.GLFW_CURSOR_DISABLED);
     _ = c.glfwSetCursorPosCallback(window, wrld.World.mouseCallback);
 
-    var renderer = ren.Renderer.init(.texture) catch |err| {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    var args = try std.process.argsWithAllocator(gpa.allocator());
+    defer args.deinit();
+    _ = args.skip();
+    const texture_name = args.next();
+
+    var renderer = ren.Renderer.init(.{
+        .starting_point = if (texture_name != null) .texture else .random,
+        .texture_name = texture_name
+    }) catch |err| {
         std.log.err("failed to initialise graphics stuff: {s}", .{@errorName(err)});
         return;
     };

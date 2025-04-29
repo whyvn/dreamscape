@@ -1,5 +1,7 @@
 #version 330 core
 
+// TODO: make all constants changable via cmd args
+
 out vec4 frag_colour;
 
 in vec2 v_uv;
@@ -100,7 +102,6 @@ vec4 most_similar() {
 
 // the inverse inluence that a push has to change the colour of the pixel its pushing too
 // const float PUSH_INFLUENCE = 0.85;
-// TODO: make these constants changable via cmd args
 const float PUSH_INFLUENCE = 0.9999;
 // the illusion of movement by pushing pixels around
 void push(vec4 current_colour) {
@@ -110,7 +111,10 @@ void push(vec4 current_colour) {
     vec4 unit = vec4(1/u_viewport, 0.0, 1.0);
     vec4 next = vec4(v_uv, 0.0, 1.0);
     next += unit * u_world_input; // translations
-    next += vec4((v_uv - CENTRE) * -u_world_input[2][2], 0.0, 0.0); // zoom
+    // `abs(v_uv - CENTRE)` is pretty cool too
+    // `0.01/(v_uv - CENTRE)` is pretty cool too`
+    // `fract(v_uv - CENTRE)` is pretty cool too`
+    next += vec4(fract(v_uv - CENTRE) * -u_world_input[2][2], 0.0, 0.0); // zoom
 
     frag_colour = mix(
         current_colour,
@@ -123,6 +127,9 @@ void push(vec4 current_colour) {
 }
 
 void main() {
+    // this is super fun too:
+    // if(v_uv.x > .9) return;
+
     vec4 similar = most_similar();
     frag_colour = vec4(mix(
         texture(u_frame, v_uv).xyz,

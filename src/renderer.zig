@@ -77,8 +77,7 @@ pub const Renderer = struct {
 
     startup: struct {
         starting_point: startingPoint = .random,
-        texture_name: ?[]const u8 = .{0},
-        texture: ?[]const u8 = .{0},
+        texture: c.GLuint = undefined,
     } = .{},
 
     fn initBuffers(self: *@This()) !void {
@@ -159,62 +158,77 @@ pub const Renderer = struct {
 
     /// populate initial fbo texture
     pub fn populateBuffer(self: *@This()) !void {
+        var init_frame: c.GLuint = undefined;
+        defer c.glDeleteProgram(init_frame);
+
         switch(self.startup.starting_point) {
             .random => {
-                const init_frame = try shaderMake("shader.vs", "init_random.fs");
-                defer c.glDeleteProgram(init_frame);
+                init_frame = try shaderMake("shader.vs", "init_random.fs");
                 c.glUseProgram(init_frame);
 
                 var seed: u64 = undefined;
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 var rand = std.rand.DefaultPrng.init(seed);
                 c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
-
-                self.draw();
             },
 
             .texture => {
-                const init_frame = try shaderMake("shader.vs", "init_texture.fs");
-                defer c.glDeleteProgram(init_frame);
+                init_frame = try shaderMake("shader.vs", "init_texture.fs");
                 c.glUseProgram(init_frame);
 
-                var texture: c.GLuint = undefined;
-                c.glGenTextures(1, &texture);
-
-                var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-                defer _ = gpa.deinit();
-
-                zstbi.init(gpa.allocator());
-                defer zstbi.deinit();
-                zstbi.setFlipVerticallyOnLoad(true);
-                var img = try zstbi.Image.loadFromFile("awesomeface.png", 0);
-                defer img.deinit();
-
-                const format = c.GL_RGB + @intFromBool(img.num_components == 4) - @as(c_int, @intFromBool(img.num_components == 1))*4;
-                c.glTexImage2D(c.GL_TEXTURE_2D, 0, format, @intCast(img.width), @intCast(img.height), 0, @intCast(format), c.GL_UNSIGNED_BYTE, img.data.ptr);
+                c.glActiveTexture(c.GL_TEXTURE1);
                 c.glUniform1i(c.glGetUniformLocation(init_frame, "start"), 1);
-
-                self.draw();
-                c.glDeleteTextures(1, &texture);
             }
         }
 
+        self.draw();
         c.glUseProgram(self.shader);
     }
 
-    pub fn init(starting_point: startingPoint) !@This() {
+    pub fn textureFromPath(path: []const u8) !c.GLuint {
+        var texture: c.GLuint = undefined;
+        c.glGenTextures(1, &texture);
+        c.glBindTexture(c.GL_TEXTURE_2D, texture);
+
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        defer _ = gpa.deinit();
+
+        zstbi.init(gpa.allocator());
+        defer zstbi.deinit();
+        zstbi.setFlipVerticallyOnLoad(true);
+        var img = try zstbi.Image.loadFromFile(@ptrCast(path), 0);
+        defer img.deinit();
+
+        const format = c.GL_RGB + @intFromBool(img.num_components == 4) - @as(c_int, @intFromBool(img.num_components == 1))*4;
+        c.glTexImage2D(c.GL_TEXTURE_2D, 0, format, @intCast(img.width), @intCast(img.height), 0, @intCast(format), c.GL_UNSIGNED_BYTE, img.data.ptr);
+        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MIN_FILTER, c.GL_NEAREST);
+        c.glTexParameteri(c.GL_TEXTURE_2D, c.GL_TEXTURE_MAG_FILTER, c.GL_NEAREST);
+
+        return texture;
+    }
+
+    pub fn init(startup: struct {
+        starting_point: startingPoint,
+        texture_name: ?[]const u8
+    }) !@This() {
+        // c.glEnable(c.GL_BLEND);
+        // c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
+
         var self: @This() = undefined;
-        self.startup.starting_point = starting_point;
         try self.initBuffers();
         c.glActiveTexture(c.GL_TEXTURE0);
         c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
 
-        self.shader = 0;
-        try self.populateBuffer();
+        self.startup.starting_point = startup.starting_point;
+        if (startup.starting_point == .texture) {
+            // self.startup.texture = try textureFromPath(startup.texture_name.?);
+        }
 
         self.shader = try shaderMake("shader.vs", "shader.fs");
-        c.glUseProgram(self.shader);
         c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), 0);
+
+        try self.populateBuffer();
+        c.glUseProgram(self.shader);
 
         return self;
     }
@@ -226,6 +240,8 @@ pub const Renderer = struct {
 
         c.glDeleteProgram(self.shader);
         c.glDeleteTextures(1, &self.backbuffer);
+        if(self.startup.starting_point == .texture)
+            c.glDeleteTextures(1, &self.startup.texture);
     }
 
     pub fn draw(self: *@This()) void {

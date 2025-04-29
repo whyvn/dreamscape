@@ -30,5 +30,6 @@ pub fn build(b: *std.Build) void {
 
     const run_exec = b.addRunArtifact(exec);
     const run_step = b.step("run", "run the app");
+    if(b.args) |args| run_exec.addArgs(args);
     run_step.dependOn(&run_exec.step);
 }
