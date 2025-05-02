@@ -157,6 +157,7 @@ pub const Renderer = struct {
     }
 
     /// populate initial fbo texture
+    // TODO: cache shader programs so we dont recompile every time and just free at the end
     pub fn populateBuffer(self: *@This()) !void {
         var init_frame: c.GLuint = undefined;
         defer c.glDeleteProgram(init_frame);
@@ -177,11 +178,15 @@ pub const Renderer = struct {
                 c.glUseProgram(init_frame);
 
                 c.glActiveTexture(c.GL_TEXTURE1);
+                c.glBindTexture(c.GL_TEXTURE_2D, self.startup.texture);
                 c.glUniform1i(c.glGetUniformLocation(init_frame, "start"), 1);
             }
         }
 
         self.draw();
+
+        c.glActiveTexture(c.GL_TEXTURE0);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
         c.glUseProgram(self.shader);
     }
 
@@ -221,7 +226,7 @@ pub const Renderer = struct {
 
         self.startup.starting_point = startup.starting_point;
         if (startup.starting_point == .texture) {
-            // self.startup.texture = try textureFromPath(startup.texture_name.?);
+            self.startup.texture = try textureFromPath(startup.texture_name.?);
         }
 
         self.shader = try shaderMake("shader.vs", "shader.fs");

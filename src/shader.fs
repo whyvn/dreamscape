@@ -114,7 +114,7 @@ void push(vec4 current_colour) {
     // `abs(v_uv - CENTRE)` is pretty cool too
     // `0.01/(v_uv - CENTRE)` is pretty cool too`
     // `fract(v_uv - CENTRE)` is pretty cool too`
-    next += vec4(fract(v_uv - CENTRE) * -u_world_input[2][2], 0.0, 0.0); // zoom
+    next += vec4((v_uv - CENTRE) * -u_world_input[2][2], 0.0, 0.0); // zoom
 
     frag_colour = mix(
         current_colour,
