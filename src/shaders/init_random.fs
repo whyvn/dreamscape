@@ -2,8 +2,6 @@
 out vec4 frag_colour;
 in vec2 v_uv;
 
-// TODO: implement possible texture loading based on user input
-uniform sampler2D start;
 uniform float u_seed;
 
 // https://stackoverflow.com/a/17479300

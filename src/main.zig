@@ -34,7 +34,7 @@ pub fn main() void {
     };
     defer renderer.deinit();
 
-    var world = wrld.World.init(window, renderer.shader);
+    var world = wrld.World.init(window, renderer.shaders.main);
 
     var shared_data = shared.glfwShared{
         .renderer = &renderer,

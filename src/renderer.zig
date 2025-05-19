@@ -20,7 +20,7 @@ fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int
 
     // dont really need to cache the location since we wont be calling this that often
     c.glUniform2f(
-        c.glGetUniformLocation(renderer.shader, "u_viewport"),
+        c.glGetUniformLocation(renderer.shaders.main, "u_viewport"),
         @floatFromInt(width),
         @floatFromInt(height)
     );
@@ -66,7 +66,11 @@ pub const Renderer = struct {
     ibo: c.GLuint,
     vbo: c.GLuint,
 
-    shader: c.GLuint,
+    shaders: struct {
+        main: c.GLuint,
+        init: c.GLuint,
+        noise: c.GLuint
+    },
 
     backbuffer: c.GLuint, // as texture
 
@@ -77,7 +81,8 @@ pub const Renderer = struct {
 
     startup: struct {
         starting_point: startingPoint = .random,
-        texture: c.GLuint = undefined,
+        texture: ?c.GLuint = null,
+        texture_name: ?[]const u8 = undefined
     } = .{},
 
     fn initBuffers(self: *@This()) !void {
@@ -105,6 +110,25 @@ pub const Renderer = struct {
 
         c.glVertexAttribPointer(0, 1, c.GL_FLOAT, c.GL_FALSE, @sizeOf(c.GLfloat), null);
         c.glEnableVertexAttribArray(0);
+    }
+
+    fn initShaders(self: *@This()) !void {
+        switch(self.startup.starting_point) {
+            .random => {
+                self.shaders.init = try shaderMake("shaders/shader.vs", "shaders/init_random.fs");
+            },
+
+            .texture => {
+                self.startup.texture = try textureFromPath(self.startup.texture_name.?);
+                self.shaders.init = try shaderMake("shaders/shader.vs", "shaders/init_texture.fs");
+                c.glUseProgram(self.shaders.init);
+                c.glUniform1i(c.glGetUniformLocation(self.shaders.init, "start"), 1);
+            }
+        }
+
+        self.shaders.main = try shaderMake("shaders/shader.vs", "shaders/shader.fs");
+        c.glUseProgram(self.shaders.main);
+        c.glUniform1i(c.glGetUniformLocation(self.shaders.main, "u_frame"), 0);
     }
 
     fn shaderErrorCheck(shader: c.GLuint, pname: c.GLenum) !void {
@@ -159,27 +183,18 @@ pub const Renderer = struct {
     /// populate initial fbo texture
     // TODO: cache shader programs so we dont recompile every time and just free at the end
     pub fn populateBuffer(self: *@This()) !void {
-        var init_frame: c.GLuint = undefined;
-        defer c.glDeleteProgram(init_frame);
-
+        c.glUseProgram(self.shaders.init);
         switch(self.startup.starting_point) {
             .random => {
-                init_frame = try shaderMake("shader.vs", "init_random.fs");
-                c.glUseProgram(init_frame);
-
                 var seed: u64 = undefined;
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 var rand = std.rand.DefaultPrng.init(seed);
-                c.glUniform1f(c.glGetUniformLocation(init_frame, "u_seed"), rand.random().float(f32));
+                c.glUniform1f(c.glGetUniformLocation(self.shaders.init, "u_seed"), rand.random().float(f32));
             },
 
             .texture => {
-                init_frame = try shaderMake("shader.vs", "init_texture.fs");
-                c.glUseProgram(init_frame);
-
                 c.glActiveTexture(c.GL_TEXTURE1);
-                c.glBindTexture(c.GL_TEXTURE_2D, self.startup.texture);
-                c.glUniform1i(c.glGetUniformLocation(init_frame, "start"), 1);
+                c.glBindTexture(c.GL_TEXTURE_2D, self.startup.texture.?);
             }
         }
 
@@ -187,7 +202,7 @@ pub const Renderer = struct {
 
         c.glActiveTexture(c.GL_TEXTURE0);
         c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
-        c.glUseProgram(self.shader);
+        c.glUseProgram(self.shaders.main);
     }
 
     pub fn textureFromPath(path: []const u8) !c.GLuint {
@@ -225,15 +240,11 @@ pub const Renderer = struct {
         c.glBindTexture(c.GL_TEXTURE_2D, self.backbuffer);
 
         self.startup.starting_point = startup.starting_point;
-        if (startup.starting_point == .texture) {
-            self.startup.texture = try textureFromPath(startup.texture_name.?);
-        }
-
-        self.shader = try shaderMake("shader.vs", "shader.fs");
-        c.glUniform1i(c.glGetUniformLocation(self.shader, "u_frame"), 0);
+        self.startup.texture_name = startup.texture_name;
+        try self.initShaders();
 
         try self.populateBuffer();
-        c.glUseProgram(self.shader);
+        c.glUseProgram(self.shaders.main);
 
         return self;
     }
@@ -243,10 +254,10 @@ pub const Renderer = struct {
         c.glDeleteBuffers(1, &self.vbo);
         c.glDeleteBuffers(1, &self.ibo);
 
-        c.glDeleteProgram(self.shader);
+        c.glDeleteProgram(self.shaders.main);
         c.glDeleteTextures(1, &self.backbuffer);
         if(self.startup.starting_point == .texture)
-            c.glDeleteTextures(1, &self.startup.texture);
+            c.glDeleteTextures(1, &self.startup.texture.?);
     }
 
     pub fn draw(self: *@This()) void {
