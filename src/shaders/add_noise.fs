@@ -56,8 +56,8 @@ float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 
 void main() {
     float chance = random(vec3(gl_FragCoord.xy, u_seed));
-    if(chance >= u_chance) {
-        frag_colour = texture(u_frame, v_uv);
+    if(chance > u_chance) {
+        frag_colour = texture(u_frame, v_uv).rgba;
         return;
     }
 

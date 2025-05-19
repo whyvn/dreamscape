@@ -2,7 +2,9 @@
 out vec4 frag_colour;
 in vec2 v_uv;
 
+uniform float u_chance;
 uniform float u_seed;
+uniform sampler2D u_frame;
 
 // https://stackoverflow.com/a/17479300
 // "
@@ -53,7 +55,14 @@ float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 // "
 
 void main() {
-    float rand = random(vec3(gl_FragCoord.xy, u_seed));
+    float chance = random(vec3(gl_FragCoord.xy, u_seed));
+    if(chance > u_chance) {
+        frag_colour = texture(u_frame, v_uv).rgba;
+        return;
+    }
+
+    float rand = random(vec3(v_uv, u_seed));
+
     frag_colour = vec4(
         rand,
         random(rand),

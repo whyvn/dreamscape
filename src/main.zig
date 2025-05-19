@@ -50,6 +50,8 @@ pub fn main() void {
             c.glfwSetWindowShouldClose(window, c.GLFW_TRUE);
         } else if(c.glfwGetKey(window, c.GLFW_KEY_R) == c.GLFW_PRESS) {
             renderer.populateBuffer() catch {};
+        } else if(c.glfwGetKey(window, c.GLFW_KEY_E) == c.GLFW_PRESS) {
+            renderer.addNoise(0.01) catch {};
         }
 
         c.glfwSwapBuffers(window);

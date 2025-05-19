@@ -113,9 +113,16 @@ pub const Renderer = struct {
     }
 
     fn initShaders(self: *@This()) !void {
+        self.shaders.main = try shaderMake("shaders/shader.vs", "shaders/shader.fs");
+        c.glUseProgram(self.shaders.main);
+        c.glUniform1i(c.glGetUniformLocation(self.shaders.main, "u_frame"), 0);
+
         switch(self.startup.starting_point) {
             .random => {
-                self.shaders.init = try shaderMake("shaders/shader.vs", "shaders/init_random.fs");
+                self.shaders.init = try shaderMake("shaders/shader.vs", "shaders/noise.fs");
+                c.glUseProgram(self.shaders.init);
+                c.glUniform1f(c.glGetUniformLocation(self.shaders.init, "u_chance"), 1.0);
+                c.glUniform1i(c.glGetUniformLocation(self.shaders.init, "u_frame"), 0);
             },
 
             .texture => {
@@ -126,9 +133,9 @@ pub const Renderer = struct {
             }
         }
 
-        self.shaders.main = try shaderMake("shaders/shader.vs", "shaders/shader.fs");
-        c.glUseProgram(self.shaders.main);
-        c.glUniform1i(c.glGetUniformLocation(self.shaders.main, "u_frame"), 0);
+        self.shaders.noise = try shaderMake("shaders/shader.vs", "shaders/noise.fs");
+        c.glUseProgram(self.shaders.noise);
+        c.glUniform1i(c.glGetUniformLocation(self.shaders.noise, "u_frame"), 0);
     }
 
     fn shaderErrorCheck(shader: c.GLuint, pname: c.GLenum) !void {
@@ -175,9 +182,19 @@ pub const Renderer = struct {
         return shader;
     }
 
-    fn addNoise(self: *@This()) !void {
-        _ = self;
-        // TODO: implement a function that half mixes a bit of random pixel values to the framebfufer
+    // chance: [0, 1]
+    pub fn addNoise(self: *@This(), chance: f32) !void {
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        var rand = std.rand.DefaultPrng.init(seed);
+
+        c.glUseProgram(self.shaders.noise);
+        c.glUniform1f(c.glGetUniformLocation(self.shaders.noise, "u_seed"), rand.random().float(f32));
+        c.glUniform1f(c.glGetUniformLocation(self.shaders.noise, "u_chance"), chance);
+
+        self.draw();
+
+        c.glUseProgram(self.shaders.main);
     }
 
     /// populate initial fbo texture
@@ -189,6 +206,7 @@ pub const Renderer = struct {
                 var seed: u64 = undefined;
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 var rand = std.rand.DefaultPrng.init(seed);
+
                 c.glUniform1f(c.glGetUniformLocation(self.shaders.init, "u_seed"), rand.random().float(f32));
             },
 
