@@ -184,9 +184,11 @@ pub const Renderer = struct {
 
     // chance: [0, 1]
     pub fn addNoise(self: *@This(), chance: f32) !void {
-        var seed: u64 = undefined;
-        try std.posix.getrandom(std.mem.asBytes(&seed));
-        var rand = std.rand.DefaultPrng.init(seed);
+        var rand = std.Random.DefaultPrng.init(blk: {
+             var seed: u64 = undefined;
+             try std.posix.getrandom(std.mem.asBytes(&seed));
+             break :blk seed;
+        });
 
         c.glUseProgram(self.shaders.noise);
         c.glUniform1f(c.glGetUniformLocation(self.shaders.noise, "u_seed"), rand.random().float(f32));
@@ -203,9 +205,11 @@ pub const Renderer = struct {
         c.glUseProgram(self.shaders.init);
         switch(self.startup.starting_point) {
             .random => {
-                var seed: u64 = undefined;
-                try std.posix.getrandom(std.mem.asBytes(&seed));
-                var rand = std.rand.DefaultPrng.init(seed);
+                var rand = std.Random.DefaultPrng.init(blk: {
+                    var seed: u64 = undefined;
+                    try std.posix.getrandom(std.mem.asBytes(&seed));
+                    break :blk seed;
+                });
 
                 c.glUniform1f(c.glGetUniformLocation(self.shaders.init, "u_seed"), rand.random().float(f32));
             },

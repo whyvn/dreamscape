@@ -51,7 +51,7 @@ pub fn main() void {
         } else if(c.glfwGetKey(window, c.GLFW_KEY_R) == c.GLFW_PRESS) {
             renderer.populateBuffer() catch {};
         } else if(c.glfwGetKey(window, c.GLFW_KEY_E) == c.GLFW_PRESS) {
-            renderer.addNoise(0.01) catch {};
+            renderer.addNoise(0.001) catch {};
         }
 
         c.glfwSwapBuffers(window);
