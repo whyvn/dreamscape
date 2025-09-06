@@ -6,9 +6,11 @@ pub fn build(b: *std.Build) void {
 
     const exec = b.addExecutable(.{
         .name = "dreamscape",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize
+        })
     });
 
     const zlm_module = b.dependency("zlm", .{}).module("zlm");

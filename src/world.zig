@@ -1,10 +1,6 @@
 const std = @import("std");
-const c = @cImport({
-    @cInclude("glad/glad.h");
-    @cInclude("GLFW/glfw3.h");
-});
-
-const zlm = @import("zlm");
+const c = @import("shared.zig").c;
+const zlm = @import("zlm").as(f32);
 
 pub const World = struct {
     window: ?*c.GLFWwindow,
@@ -70,7 +66,7 @@ pub const World = struct {
         self.setInputs();
     }
 
-    pub fn mouseCallback(window: ?*c.GLFWwindow, x_pos: f64, y_pos: f64) callconv(.C) void {
+    pub fn mouseCallback(window: ?*c.GLFWwindow, x_pos: f64, y_pos: f64) callconv(.c) void {
         const world = @import("shared.zig").glfwShared.getWorld(window.?);
         world.mouse = .{
             .last_x = world.mouse.x,

@@ -9,7 +9,7 @@ pub const glfwShared = struct {
     renderer: *Renderer,
     world: *World,
 
-    pub fn setWindowPtr(self: *@This(), window: *c.GLFWwindow) void {
+    pub fn setWindowPtr(self: *@This(), window: ?*c.GLFWwindow) void {
         c.glfwSetWindowUserPointer(window, self);
     }
 

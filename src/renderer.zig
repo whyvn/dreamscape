@@ -1,11 +1,8 @@
 const std = @import("std");
-const c = @cImport({
-    @cInclude("glad/glad.h");
-    @cInclude("GLFW/glfw3.h");
-});
+const c = @import("shared.zig").c;
 const zstbi = @import("zstbi");
 
-fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.C) void {
+fn framebuffer_size_callback(window: ?*c.GLFWwindow, width: c_int, height: c_int) callconv(.c) void {
     c.glViewport(0, 0, width, height);
 
     // technically dont need to use a user pointer to get Renderer
@@ -34,7 +31,7 @@ const WindowCreationError = error{
     gladLoading
 };
 
-pub fn createWindow() !*c.GLFWwindow {
+pub fn createWindow() !?*c.GLFWwindow {
     if (c.glfwInit() == 0)
         return error.glfwInit;
     c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -52,8 +49,7 @@ pub fn createWindow() !*c.GLFWwindow {
     if (c.gladLoadGLLoader(@ptrCast(&c.glfwGetProcAddress)) == c.GL_FALSE)
         return error.gladLoading;
 
-    // remove optional pointer since we wouldve propagated the error already
-    return @ptrCast(window);
+    return window;
 }
 
 pub const Renderer = struct {

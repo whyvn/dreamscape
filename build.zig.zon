@@ -28,7 +28,7 @@
 
     // Tracks the earliest Zig version that the package considers to be a
     // supported use case.
-    .minimum_zig_version = "0.14.1",
+    .minimum_zig_version = "0.15.1",
 
     // This field is optional.
     // Each dependency must either provide a `url` and `hash`, or a `path`.
@@ -37,12 +37,12 @@
     // internet connectivity.
     .dependencies = .{
         .zlm = .{
-            .url = "git+https://github.com/ziglibs/zlm#e4dc388f2ce73d0734867c5baa9e9a5c84238ca4",
-            .hash = "zlm-0.1.0-AAAAAB6gAABdoukNmdFJDjSeVeSt8trl5EKm8TOcJqQs",
+            .url = "git+https://github.com/ziglibs/zlm#93ae19f624bd13eee4335eb30a28aac6897795c5",
+            .hash = "zlm-0.1.0-LoZ6yMqsAAD-97Rj6egP9ja5o3CF96IvvruK-lGA7mkX",
         },
         .zstbi = .{
-            .url = "git+https://github.com/zig-gamedev/zstbi#a70604a93988ee553d0ae6a3871726270a6025d5",
-            .hash = "zstbi-0.11.0-dev-L0Ea_9WVBwAO8t0Qbr87vnCEf1QBcNQHbV-O_D0UWYqT",
+            .url = "git+https://github.com/zig-gamedev/zstbi#2c4b3100ccb7aed90ecc9439030899764e2a8d47",
+            .hash = "zstbi-0.11.0-dev-L0Ea_yaWBwAHwFoCuyjkFyaiSsbjt4UOrkntR0c_nmzz",
         },
     },
     .paths = .{

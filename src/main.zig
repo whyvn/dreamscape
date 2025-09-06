@@ -1,11 +1,8 @@
 const std = @import("std");
-pub const c = @cImport({
-    @cInclude("glad/glad.h");
-    @cInclude("GLFW/glfw3.h");
-});
 const ren = @import("renderer.zig");
 const wrld = @import("world.zig");
 const shared = @import("shared.zig");
+const c = shared.c;
 
 pub fn main() void {
     const window = ren.createWindow() catch |err| {
